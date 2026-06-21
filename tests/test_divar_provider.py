@@ -1,15 +1,7 @@
-from scraper import DivarProvider, parse_price
+from app.providers.divar import DivarProvider
 
 
-def test_parse_price_with_persian_digits():
-    assert parse_price("۸٬۵۰۰٬۰۰۰٬۰۰۰ تومان") == 8_500_000_000
-
-
-def test_parse_price_with_unit():
-    assert parse_price("قیمت: ۸.۵ میلیارد تومان") == 8_500_000_000
-
-
-def test_extract_post_rows_only():
+def test_extract_current_post_row():
     payload = {
         "list_widgets": [
             {
@@ -34,7 +26,10 @@ def test_extract_post_rows_only():
     result = DivarProvider._extract(payload)
     assert len(result) == 1
     assert result[0].price == 7_000_000_000
+    assert result[0].area == 80
     assert result[0].location == "تهران، پونک"
+    assert result[0].city == "تهران"
+    assert result[0].address == "تهران، پونک"
 
 
 def test_payload_uses_current_category():
