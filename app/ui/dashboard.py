@@ -8,8 +8,9 @@ from app.auth.service import AuthService
 from app.db.repository import ListingRepository
 from app.memory.service import UserMemoryService
 from app.models.agent import AgentResponse
+from app.models.category import PROPERTY, category_label
 from app.models.search import SearchCriteria, SearchResult
-from app.providers.divar import DivarProvider
+from app.providers.registry import build_providers, close_providers
 from app.services.decision_engine import DecisionEngine
 from app.services.geocoder import GeocoderService
 from app.services.location_catalog import LocationCatalogService
@@ -38,7 +39,7 @@ from app.ui.styles import APP_CSS
 def run_dashboard() -> None:
     load_dotenv()
     st.set_page_config(
-        page_title="خانه‌یاب | دستیار خرید ملک",
+        page_title="آگهی‌یاب | ملک و وسایل نقلیه",
         page_icon=":material/home:",
         layout="wide",
         initial_sidebar_state="collapsed",
@@ -71,8 +72,10 @@ def run_dashboard() -> None:
 
     result = st.session_state.get("search_result")
     if result is not None:
+        for source, message in result.source_errors.items():
+            st.warning(f"منبع {source} در دسترس نبود: {message}")
         if not result.items:
-            st.warning("آگهی منطبق با بودجه و متراژ انتخاب‌شده پیدا نشد.")
+            st.warning("آگهی منطبق با فیلترهای انتخاب‌شده پیدا نشد.")
             return
         render_section_title("نمای کلی", "خلاصه‌ای از نتیجه آخرین جست‌وجو.")
         render_summary(result)
@@ -89,9 +92,10 @@ def run_dashboard() -> None:
         if "selected_listing_id" not in st.session_state:
             st.session_state["selected_listing_id"] = result.items[0].listing.external_id
 
+        views = ("نمای فهرست", "نمای نقشه") if result.category == PROPERTY else ("نمای فهرست",)
         view = st.radio(
             "نوع نمایش نتایج",
-            ("نمای فهرست", "نمای نقشه"),
+            views,
             horizontal=True,
             label_visibility="collapsed",
         )
@@ -103,7 +107,7 @@ def run_dashboard() -> None:
             st.markdown(
                 """
                 <div class="map-legend">
-                    <span><i class="dot selected"></i>ملک منتخب</span>
+                    <span><i class="dot selected"></i>آگهی منتخب</span>
                     <span><i class="dot best"></i>بهترین رتبه</span>
                     <span><i class="dot normal"></i>سایر آگهی‌ها</span>
                 </div>
@@ -133,7 +137,7 @@ def run_dashboard() -> None:
             )
         with note_col:
             st.caption(
-                "این نتایج برای بررسی اولیه‌اند؛ سند، مالکیت، قیمت و وضعیت فنی ملک باید مستقل راستی‌آزمایی شوند."
+                "این نتایج برای بررسی اولیه‌اند؛ قیمت، مالکیت، مدارک و وضعیت فنی باید مستقل راستی‌آزمایی شوند."
             )
         if view == "نمای نقشه":
             render_listing_details(result.items)
@@ -149,10 +153,10 @@ def _execute_search(
     city_ids = locations.city_ids
     if criteria.city_id:
         city_ids[criteria.city] = criteria.city_id
-    provider = DivarProvider(city_ids=city_ids)
+    providers = build_providers(city_ids)
     repository = ListingRepository()
     geocoder = GeocoderService(repository, city_centers=locations.city_centers)
-    service = SearchService(provider, repository, ranking, geocoder)
+    service = SearchService(providers, repository, ranking, geocoder)
     try:
         memory.remember_search(user_id, criteria, mode="filter")
         with st.spinner("در حال دریافت، فیلتر و رتبه‌بندی آگهی‌ها..."):
@@ -169,7 +173,7 @@ def _execute_search(
         st.caption("ممکن است دسترسی یا ساختار سرویس منبع موقتاً تغییر کرده باشد.")
     finally:
         geocoder.close()
-        provider.close()
+        close_providers(providers)
 
 
 def _execute_agent(
@@ -179,11 +183,11 @@ def _execute_agent(
     memory: UserMemoryService,
     locations: LocationCatalogService,
 ) -> None:
-    provider = DivarProvider(city_ids=locations.city_ids)
+    providers = build_providers(locations.city_ids)
     repository = ListingRepository()
     geocoder = GeocoderService(repository, city_centers=locations.city_centers)
     search_service = SearchService(
-        provider, repository, RankingService(api_key=""), geocoder
+        providers, repository, RankingService(api_key=""), geocoder
     )
     agent = RealEstateAgent(
         search_service,
@@ -203,7 +207,7 @@ def _execute_agent(
         st.caption("در صورت خطای OpenAI، parser قانون‌محور به‌صورت خودکار استفاده می‌شود.")
     finally:
         geocoder.close()
-        provider.close()
+        close_providers(providers)
 
 
 def _render_list_view(result: SearchResult) -> None:
@@ -212,7 +216,7 @@ def _render_list_view(result: SearchResult) -> None:
     current_id = st.session_state.get("selected_listing_id", options[0])
     index = options.index(current_id) if current_id in options else 0
     selected_id = st.selectbox(
-        "ملک منتخب برای بررسی",
+        f"{category_label(result.category)} منتخب برای بررسی",
         options,
         index=index,
         format_func=lambda listing_id: by_id[listing_id].listing.title,

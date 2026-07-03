@@ -7,6 +7,7 @@ from typing import Any
 from openai import OpenAI
 
 from app.models.analysis import Analysis
+from app.models.category import category_label
 from app.models.listing import Listing
 
 
@@ -87,6 +88,7 @@ class RankingService:
                 "area": listing.area,
                 "location": listing.location,
                 "description": listing.description,
+                "category": category_label(listing.category),
             }
             for listing in candidates
         ]
@@ -104,7 +106,7 @@ class RankingService:
             input=[
                 {
                     "role": "system",
-                    "content": "شما دستیار تحلیل اولیه خرید ملک هستید، نه کارشناس حقوقی یا قیمت‌گذاری رسمی.",
+                    "content": "شما دستیار تحلیل اولیه خرید ملک و وسیله نقلیه هستید، نه کارشناس رسمی حقوقی، فنی یا قیمت‌گذاری.",
                 },
                 {"role": "user", "content": prompt},
             ],

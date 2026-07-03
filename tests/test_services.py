@@ -66,16 +66,20 @@ def test_repository_migrates_existing_database_for_location(tmp_path: Path):
         columns = {
             row[1] for row in connection.execute("PRAGMA table_info(listings)")
         }
-    assert {"latitude", "longitude", "address", "city"} <= columns
+    assert {"latitude", "longitude", "address", "city", "category"} <= columns
 
 
 def test_search_service_orchestrates_provider_filter_and_repository(tmp_path: Path):
     class FakeProvider:
         name = "fake"
+        categories = ("property",)
 
-        def search(self, city: str, pages: int = 1) -> list[Listing]:
+        def search(
+            self, city: str, pages: int = 1, category: str = "property"
+        ) -> list[Listing]:
             assert city == "تهران"
             assert pages == 2
+            assert category == "property"
             return [
                 listing("match", 8_000_000_000, 90),
                 listing("over-budget", 11_000_000_000, 100),
@@ -92,3 +96,41 @@ def test_search_service_orchestrates_provider_filter_and_repository(tmp_path: Pa
     result = service.search(criteria)
     assert result.fetched_count == 2
     assert [item.listing.external_id for item in result.items] == ["match"]
+
+
+def test_search_service_keeps_results_when_one_provider_fails(tmp_path: Path):
+    class WorkingProvider:
+        name = "working"
+        categories = ("car",)
+
+        def search(self, city, pages=1, category="property"):
+            return [
+                Listing(
+                    "working",
+                    "car-1",
+                    "خودرو",
+                    900_000_000,
+                    city,
+                    "https://example.com/car",
+                    city=city,
+                    category="car",
+                )
+            ]
+
+    class FailingProvider:
+        name = "offline"
+        categories = ("car",)
+
+        def search(self, city, pages=1, category="property"):
+            raise RuntimeError("temporarily unavailable")
+
+    service = SearchService(
+        [FailingProvider(), WorkingProvider()],
+        ListingRepository(tmp_path / "multi.db"),
+        RankingService(api_key=""),
+    )
+    result = service.search(
+        SearchCriteria("تهران", 1_000_000_000, category="car", use_ai=False)
+    )
+    assert [item.listing.external_id for item in result.items] == ["car-1"]
+    assert result.source_errors == {"offline": "temporarily unavailable"}

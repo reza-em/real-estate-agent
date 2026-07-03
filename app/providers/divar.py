@@ -8,10 +8,16 @@ import httpx
 
 from app.core.parsing import parse_area, parse_price
 from app.models.listing import Listing
+from app.models.category import CAR, MOTORCYCLE, PROPERTY
 
 
 DIVAR_SEARCH_URL = "https://api.divar.ir/v8/postlist/w/search"
 DIVAR_BUY_CATEGORIES = ("apartment-sell", "house-villa-sell")
+DIVAR_CATEGORIES = {
+    PROPERTY: DIVAR_BUY_CATEGORIES,
+    CAR: ("light",),
+    MOTORCYCLE: ("motorcycles",),
+}
 from app.services.location_catalog import FALLBACK_CAPITALS
 
 
@@ -22,6 +28,7 @@ class DivarProvider:
     """Fetches and normalizes Divar search results."""
 
     name = "divar"
+    categories = tuple(DIVAR_CATEGORIES)
 
     def __init__(
         self,
@@ -36,24 +43,29 @@ class DivarProvider:
             headers={"User-Agent": "RealEstateResearch/0.2 (personal-use)"},
         )
 
-    def search(self, city: str, pages: int = 1) -> list[Listing]:
+    def search(
+        self, city: str, pages: int = 1, category: str = PROPERTY
+    ) -> list[Listing]:
         if city not in self.city_ids:
             raise ValueError(f"شهر پشتیبانی نمی‌شود: {city}")
+        if category not in DIVAR_CATEGORIES:
+            return []
 
         results: dict[str, Listing] = {}
         page_count = min(max(pages, 1), 5)
-        for category_index, category in enumerate(DIVAR_BUY_CATEGORIES):
+        source_categories = DIVAR_CATEGORIES[category]
+        for category_index, source_category in enumerate(source_categories):
             for page in range(1, page_count + 1):
                 response = self.client.post(
                     DIVAR_SEARCH_URL,
-                    json=self._payload(self.city_ids[city], page, category),
+                    json=self._payload(self.city_ids[city], page, source_category),
                 )
                 self._raise_for_status(response)
-                for listing in self._extract(response.json()):
+                for listing in self._extract(response.json(), category):
                     results[listing.external_id] = listing
                 if page < page_count:
                     time.sleep(self.request_delay)
-            if category_index < len(DIVAR_BUY_CATEGORIES) - 1:
+            if category_index < len(source_categories) - 1:
                 time.sleep(self.request_delay)
         return list(results.values())
 
@@ -101,19 +113,23 @@ class DivarProvider:
         }
 
     @classmethod
-    def _extract(cls, payload: dict[str, Any]) -> list[Listing]:
+    def _extract(
+        cls, payload: dict[str, Any], category: str = PROPERTY
+    ) -> list[Listing]:
         widgets = payload.get("list_widgets") or payload.get("list_web_widgets") or []
         listings: list[Listing] = []
         for widget in widgets:
             if widget.get("widget_type") != "POST_ROW":
                 continue
-            listing = cls._parse_widget(widget.get("data") or {})
+            listing = cls._parse_widget(widget.get("data") or {}, category)
             if listing:
                 listings.append(listing)
         return listings
 
     @staticmethod
-    def _parse_widget(data: dict[str, Any]) -> Listing | None:
+    def _parse_widget(
+        data: dict[str, Any], category: str = PROPERTY
+    ) -> Listing | None:
         action_payload = (data.get("action") or {}).get("payload") or {}
         web_info = action_payload.get("web_info") or {}
         token = str(data.get("token") or action_payload.get("token") or "")
@@ -147,8 +163,9 @@ class DivarProvider:
             location=location,
             url=f"https://divar.ir/v/-/{token}",
             description=price_text,
-            area=parse_area(title),
+            area=parse_area(title) if category == PROPERTY else None,
             raw=data,
             address=location or None,
             city=city,
+            category=category,
         )

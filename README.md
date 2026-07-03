@@ -4,6 +4,12 @@ A Persian Streamlit dashboard for retrieving residential property listings,
 filtering by budget and area, storing results in SQLite, displaying properties
 on a map, and providing a personalized intelligent agent.
 
+The dashboard also searches car and motorcycle listings. Property results are
+aggregated from Divar, Sheypoor, Iran File, and Kilid. Vehicle results are
+aggregated from Divar and Sheypoor, with inspected cars from Hamrah Mechanic.
+Each source fails independently, so an unavailable website does not discard
+results returned by the other providers.
+
 ## Running the Application
 
 On Ubuntu/Debian, install `python3-venv` first if creating a virtual environment
@@ -92,6 +98,8 @@ pytest -q
 - The current Divar integration is a defensive client for public search responses, not a guaranteed partner API.
 - A production deployment must verify each source's official access path, permissions, rate limits, and terms of use.
 - Listings are not legally authoritative. Price, ownership, title documents, and property condition must be verified independently.
+- Iran File currently exposes its public purchase list for Tehran; searches for other cities continue with the remaining providers.
+- Source adapters only read publicly accessible pages and do not bypass authentication or anti-bot controls.
 
 ---
 
@@ -99,6 +107,11 @@ pytest -q
 
 داشبورد فارسی Streamlit برای دریافت آگهی‌های خرید مسکونی، فیلتر بودجه و متراژ،
 ذخیره در SQLite، نقشه و عامل هوشمند شخصی‌سازی‌شده.
+
+داشبورد از دسته‌های ملک، خودرو و موتورسیکلت پشتیبانی می‌کند. نتایج ملک از دیوار،
+شیپور، ایران‌فایل و کیلید تجمیع می‌شوند. نتایج وسایل نقلیه از دیوار و شیپور و
+خودروهای کارشناسی‌شده از همراه‌مکانیک دریافت می‌شوند. خطای هر منبع مستقل است و
+قطع یک سایت نتایج سایت‌های دیگر را حذف نمی‌کند.
 
 ## اجرا
 
@@ -184,3 +197,5 @@ pytest -q
 - اتصال فعلی دیوار یک کلاینت دفاعی برای پاسخ جست‌وجوی عمومی است و API شریک تضمین‌شده نیست.
 - برای محصول واقعی باید مجوز/مسیر رسمی هر منبع، نرخ درخواست و شرایط استفاده بررسی شود.
 - آگهی‌ها داده قابل اعتماد حقوقی نیستند؛ قیمت، مالکیت، سند و وضعیت بنا باید جداگانه بررسی شوند.
+- فهرست عمومی خرید ایران‌فایل فعلاً برای تهران ارائه می‌شود؛ در شهرهای دیگر جست‌وجو با سایر منابع ادامه پیدا می‌کند.
+- adapterها فقط صفحات عمومی را می‌خوانند و ورود، احراز هویت یا محافظت ضدبات را دور نمی‌زنند.

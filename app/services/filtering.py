@@ -7,6 +7,8 @@ def filter_listings(
 ) -> list[Listing]:
     filtered = []
     for listing in listings:
+        if listing.category != criteria.category:
+            continue
         if listing.price is None or listing.price > criteria.max_price:
             continue
         if criteria.min_area and (

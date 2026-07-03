@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from app.models.analysis import Analysis
+from app.models.category import PROPERTY, category_label
 from app.models.memory import UserProfile
 from app.models.search import RankedListing, SearchCriteria
 
@@ -26,7 +27,11 @@ class DecisionEngine:
     ) -> RankedListing:
         listing = item.listing
         price_score = self._price_score(listing.price, criteria.max_price)
-        area_score = self._area_score(listing.area, criteria.min_area)
+        area_score = (
+            self._area_score(listing.area, criteria.min_area)
+            if criteria.category == PROPERTY
+            else 18
+        )
         location_score = self._location_score(
             listing.city, listing.location, criteria.city
         )
@@ -43,7 +48,7 @@ class DecisionEngine:
         if location_score == 20:
             reasons.append(f"در شهر موردنظر شما، {criteria.city}، قرار دارد")
         if listing.external_id in profile.liked_properties:
-            reasons.append("این ملک را قبلاً پسندیده‌اید")
+            reasons.append(f"این {category_label(criteria.category)} را قبلاً پسندیده‌اید")
         elif history_score >= 12 and profile.interaction_count:
             reasons.append("با الگوی جست‌وجوهای قبلی شما هماهنگ است")
 

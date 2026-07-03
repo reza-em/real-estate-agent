@@ -16,6 +16,7 @@ class SearchCriteria:
     use_ai: bool = True
     province: str = ""
     city_id: str = ""
+    category: str = "property"
 
 
 @dataclass(slots=True)
@@ -31,6 +32,8 @@ class SearchResult:
     ai_requested: bool = False
     ai_available: bool = False
     city: str = ""
+    category: str = "property"
+    source_errors: dict[str, str] = field(default_factory=dict)
 
     @property
     def best(self) -> RankedListing | None:

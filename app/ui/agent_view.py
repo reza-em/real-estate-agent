@@ -6,6 +6,7 @@ from app.core.formatting import format_toman
 from app.memory.service import UserMemoryService
 from app.models.auth import AuthUser
 from app.models.agent import AgentResponse
+from app.models.category import category_label
 from app.models.memory import UserProfile
 from app.models.search import RankedListing
 from app.ui.components import render_section_title
@@ -43,11 +44,11 @@ def render_agent_form(
     ai_available: bool, profile: UserProfile
 ) -> tuple[str, int] | None:
     render_section_title(
-        "از دستیار ملک بپرسید",
-        "نیازتان را معمولی بنویسید؛ بودجه، شهر و متراژ به‌طور خودکار استخراج می‌شوند.",
+        "از دستیار خرید بپرسید",
+        "نیازتان را معمولی بنویسید؛ دسته، بودجه، شهر و جزئیات به‌طور خودکار استخراج می‌شوند.",
     )
     placeholder = (
-        "مثلاً یک آپارتمان ارزان در تهران تا ۵ میلیارد و حداقل ۸۰ متر می‌خواهم"
+        "مثلاً خودرو اتومات در تهران تا ۲ میلیارد یا آپارتمان حداقل ۸۰ متر می‌خواهم"
     )
     with st.form("agent_query_form"):
         query = st.text_area(
@@ -71,7 +72,7 @@ def render_agent_form(
     if not submitted:
         return None
     if not query.strip():
-        st.warning("لطفاً نیاز ملکی خود را بنویسید.")
+        st.warning("لطفاً نیاز خرید خود را بنویسید.")
         return None
     return query.strip(), pages
 
@@ -87,8 +88,8 @@ def render_agent_recommendations(
         f"""
         <div class="agent-query-summary">
             <strong>برداشت عامل از درخواست:</strong>
-            شهر {criteria.city} · بودجه {format_toman(criteria.max_price)} ·
-            حداقل {criteria.min_area or 'بدون محدودیت'} متر · پردازش با {parser_label}
+            دسته {category_label(criteria.category)} · شهر {criteria.city} · بودجه {format_toman(criteria.max_price)} ·
+            {f'حداقل {criteria.min_area} متر · ' if criteria.min_area else ''}پردازش با {parser_label}
         </div>
         """,
         unsafe_allow_html=True,
@@ -118,7 +119,7 @@ def _render_recommendation_card(
         st.markdown(f"### {listing.title}")
         st.markdown(
             f"**{format_toman(listing.price)}**  \n"
-            f"{listing.area or 'نامشخص'} متر · {listing.location or 'موقعیت نامشخص'}"
+            f"{f'{listing.area} متر · ' if listing.area else ''}{listing.location or 'موقعیت نامشخص'} · {listing.source}"
         )
         st.progress(analysis.score, text="امتیاز نهایی")
         st.markdown(f"<div class='agent-reason'>{analysis.summary}</div>", unsafe_allow_html=True)

@@ -11,6 +11,7 @@ from openai import OpenAI
 from app.core.parsing import normalize_digits
 from app.memory.service import UserMemoryService
 from app.models.agent import AgentResponse, ParsedAgentQuery
+from app.models.category import CAR, CATEGORIES, MOTORCYCLE, PROPERTY
 from app.models.memory import UserProfile
 from app.models.search import SearchCriteria
 from app.providers.divar import CITY_IDS
@@ -60,6 +61,7 @@ class AgentQueryParser:
             "budget": profile.budget or 10_000_000_000,
             "min_area": profile.min_area,
             "preferences": profile.preferences,
+            "category": PROPERTY,
         }
         client = self._client or OpenAI(api_key=self.api_key)
         response = client.responses.create(
@@ -68,7 +70,7 @@ class AgentQueryParser:
                 {
                     "role": "system",
                     "content": (
-                        "درخواست خرید ملک را به فیلتر ساختاری تبدیل کن. "
+                        "درخواست خرید ملک، خودرو یا موتورسیکلت را به فیلتر ساختاری تبدیل کن. "
                         "مبالغ را همیشه به تومان برگردان و اطلاعات ناموجود را از defaults بردار."
                     ),
                 },
@@ -88,8 +90,9 @@ class AgentQueryParser:
     ) -> ParsedAgentQuery:
         normalized = normalize_digits(text).lower().replace("٬", "").replace(",", "")
         city = self._find_city(normalized, profile)
+        category = self._find_category(normalized)
         budget = self._find_budget(normalized) or profile.budget or 10_000_000_000
-        min_area = self._find_area(normalized)
+        min_area = self._find_area(normalized) if category == PROPERTY else 0
         if min_area is None:
             min_area = profile.min_area
         criteria = SearchCriteria(
@@ -99,6 +102,7 @@ class AgentQueryParser:
             pages=min(max(pages, 1), 5),
             preferences=text.strip() or profile.preferences,
             use_ai=False,
+            category=category,
         )
         return ParsedAgentQuery(criteria=criteria, parser="rules")
 
@@ -110,6 +114,14 @@ class AgentQueryParser:
             if re.search(rf"\b{re.escape(alias)}\b", text):
                 return city
         return profile.preferred_cities[-1] if profile.preferred_cities else "تهران"
+
+    @staticmethod
+    def _find_category(text: str) -> str:
+        if any(word in text for word in ("موتور", "موتورسیکلت", "motorcycle", "motorbike")):
+            return MOTORCYCLE
+        if any(word in text for word in ("خودرو", "ماشین", "اتومبیل", "car", "vehicle")):
+            return CAR
+        return PROPERTY
 
     @staticmethod
     def _find_budget(text: str) -> int | None:
@@ -142,13 +154,21 @@ class AgentQueryParser:
         city = str(data["city"])
         if city not in self.city_names:
             city = "تهران"
+        category = (
+            str(data.get("category"))
+            if str(data.get("category")) in CATEGORIES
+            else PROPERTY
+        )
         return SearchCriteria(
             city=city,
             max_price=max(100_000_000, int(data["budget"])),
-            min_area=max(0, int(data["min_area"])),
+            min_area=(
+                max(0, int(data["min_area"])) if category == PROPERTY else 0
+            ),
             pages=min(max(pages, 1), 5),
             preferences=str(data.get("preferences") or original_text),
             use_ai=False,
+            category=category,
         )
 
     @staticmethod
@@ -164,8 +184,9 @@ class AgentQueryParser:
                     "budget": {"type": "integer", "minimum": 100_000_000},
                     "min_area": {"type": "integer", "minimum": 0},
                     "preferences": {"type": "string"},
+                    "category": {"type": "string", "enum": list(CATEGORIES)},
                 },
-                "required": ["city", "budget", "min_area", "preferences"],
+                "required": ["city", "budget", "min_area", "preferences", "category"],
                 "additionalProperties": False,
             },
         }

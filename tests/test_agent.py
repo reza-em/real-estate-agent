@@ -60,6 +60,16 @@ def test_rule_parser_supports_catalog_cities_beyond_legacy_list():
     assert result.criteria.city == "پردیس"
 
 
+def test_rule_parser_detects_vehicle_categories():
+    parser = AgentQueryParser(api_key="")
+    profile = UserProfile("u")
+    car = parser.parse("ماشین اتومات در تهران تا ۲ میلیارد", profile)
+    motorcycle = parser.parse("موتورسیکلت در شیراز تا ۳۰۰ میلیون", profile)
+    assert car.criteria.category == "car"
+    assert car.criteria.min_area == 0
+    assert motorcycle.criteria.category == "motorcycle"
+
+
 def test_decision_engine_uses_rejected_property_memory():
     profile = UserProfile(
         "u", preferred_cities=["تهران"], min_area=80, rejected_properties={"bad"}

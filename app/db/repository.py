@@ -46,8 +46,8 @@ class ListingRepository:
                 INSERT INTO listings
                     (source, external_id, title, price, area, location, url,
                      description, raw_json, latitude, longitude, address, city,
-                     location_precision)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                     location_precision, category)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 ON CONFLICT(source, external_id) DO UPDATE SET
                     title=excluded.title, price=excluded.price, area=excluded.area,
                     location=excluded.location, url=excluded.url,
@@ -55,6 +55,7 @@ class ListingRepository:
                     latitude=excluded.latitude, longitude=excluded.longitude,
                     address=excluded.address, city=excluded.city,
                     location_precision=excluded.location_precision,
+                    category=excluded.category,
                     seen_at=CURRENT_TIMESTAMP
                 """,
                 [
@@ -73,6 +74,7 @@ class ListingRepository:
                         item.address,
                         item.city,
                         item.location_precision,
+                        item.category,
                     )
                     for item in listings
                 ],
@@ -156,6 +158,7 @@ class ListingRepository:
                 address TEXT,
                 city TEXT,
                 location_precision TEXT NOT NULL DEFAULT 'unknown',
+                category TEXT NOT NULL DEFAULT 'property',
                 location TEXT,
                 url TEXT NOT NULL,
                 description TEXT,
@@ -189,6 +192,7 @@ class ListingRepository:
             "address": "TEXT",
             "city": "TEXT",
             "location_precision": "TEXT NOT NULL DEFAULT 'unknown'",
+            "category": "TEXT NOT NULL DEFAULT 'property'",
         }
         for column, definition in migrations.items():
             if column not in columns:

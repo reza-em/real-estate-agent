@@ -21,6 +21,7 @@ class Listing:
     address: str | None = None
     city: str = ""
     location_precision: str = "unknown"
+    category: str = "property"
 
     @property
     def has_coordinates(self) -> bool:

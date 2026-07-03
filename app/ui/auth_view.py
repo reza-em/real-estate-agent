@@ -27,8 +27,8 @@ def render_auth_gate(auth: AuthService) -> AuthUser | None:
     st.markdown(
         """
         <section class="auth-hero">
-            <div class="auth-brand">خانه‌یاب</div>
-            <h1>جست‌وجوی هوشمند ملک، متناسب با شما</h1>
+            <div class="auth-brand">آگهی‌یاب</div>
+            <h1>جست‌وجوی هوشمند ملک و وسیله نقلیه، متناسب با شما</h1>
             <p>برای نگهداری امن سابقه جست‌وجو و پیشنهادهای شخصی وارد حساب خود شوید.</p>
         </section>
         """,

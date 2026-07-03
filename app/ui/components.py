@@ -6,6 +6,7 @@ import pandas as pd
 import streamlit as st
 
 from app.core.formatting import format_toman
+from app.models.category import CATEGORIES, CATEGORY_LABELS, PROPERTY, category_label
 from app.models.memory import UserProfile
 from app.models.search import RankedListing, SearchCriteria, SearchResult
 from app.services.location_catalog import LocationCatalogService
@@ -15,9 +16,9 @@ def render_header() -> None:
     st.markdown(
         """
         <section class="hero">
-            <div class="hero-kicker">دستیار هوشمند جست‌وجوی ملک</div>
-            <h1>خانه مناسب را سریع‌تر پیدا کنید</h1>
-            <p>آگهی‌های خرید را یک‌جا بررسی، بر اساس بودجه فیلتر و با معیارهای شما رتبه‌بندی می‌کنیم.</p>
+            <div class="hero-kicker">دستیار هوشمند جست‌وجوی آگهی</div>
+            <h1>ملک یا وسیله نقلیه مناسب را سریع‌تر پیدا کنید</h1>
+            <p>آگهی‌های چند منبع را یک‌جا بررسی، بر اساس بودجه فیلتر و با معیارهای شما رتبه‌بندی می‌کنیم.</p>
         </section>
         """,
         unsafe_allow_html=True,
@@ -43,6 +44,13 @@ def render_search_form(
         profile.preferred_cities[-1] if profile.preferred_cities else "تهران"
     )
     preferred_province = locations.province_for_city(preferred_city) or "تهران"
+    category = st.radio(
+        "دسته‌بندی",
+        CATEGORIES,
+        format_func=lambda value: CATEGORY_LABELS[value],
+        horizontal=True,
+        key="listing_category",
+    )
     with st.form("search_filters"):
         first, second, third, fourth, fifth = st.columns([1, 1, 1.3, 1, .9])
         with first:
@@ -65,14 +73,23 @@ def render_search_form(
             )
         with fourth:
             min_area = st.number_input(
-                "حداقل متراژ", min_value=0, max_value=10_000, value=0, step=5
+                "حداقل متراژ" if category == PROPERTY else "متراژ (ویژه ملک)",
+                min_value=0,
+                max_value=10_000,
+                value=0,
+                step=5,
+                disabled=category != PROPERTY,
             )
         with fifth:
             pages = st.slider("صفحه از هر دسته", 1, 5, 1)
 
         preferences = st.text_area(
             "اولویت‌ها و توضیحات",
-            placeholder="مثلاً دو خواب، پارکینگ، آسانسور، منطقه ۵ و سن بنا کمتر از ۱۰ سال",
+            placeholder=(
+                "مثلاً دو خواب، پارکینگ، آسانسور و سن بنا کمتر از ۱۰ سال"
+                if category == PROPERTY
+                else "مثلاً مدل، سال ساخت، کارکرد، گیربکس و وضعیت بدنه"
+            ),
             height=88,
         )
         option_col, hint_col, button_col = st.columns([1.1, 2, 1.1])
@@ -94,12 +111,13 @@ def render_search_form(
     return SearchCriteria(
         city=city,
         max_price=int(max_price_billion * 1_000_000_000),
-        min_area=int(min_area),
+        min_area=int(min_area) if category == PROPERTY else 0,
         pages=pages,
         preferences=preferences.strip(),
         use_ai=use_ai,
         province=province,
         city_id=city_option.id if city_option else "",
+        category=category,
     )
 
 
@@ -122,18 +140,18 @@ def render_best_deals(items: list[RankedListing]) -> None:
         listing = item.listing
         analysis = item.analysis
         css_class = "deal-card best" if index == 0 else "deal-card"
-        area = f"{listing.area} متر" if listing.area else "متراژ نامشخص"
+        detail = f"{listing.area} متر" if listing.area else category_label(listing.category)
         card = f"""
         <article class="{css_class}">
             <div class="deal-rank">{labels[index]}</div>
             <div class="deal-title">{escape(listing.title)}</div>
-            <div class="deal-meta">{escape(listing.location or 'موقعیت نامشخص')} · {area}</div>
+            <div class="deal-meta">{escape(listing.location or 'موقعیت نامشخص')} · {detail} · {escape(listing.source)}</div>
             <div class="deal-price">{format_toman(listing.price)}</div>
             <div class="score-row">
                 <span class="score-pill">{analysis.score}</span>
                 <div class="score-track"><div class="score-fill" style="width:{analysis.score}%"></div></div>
             </div>
-            <a class="deal-link" href="{escape(listing.url, quote=True)}" target="_blank" rel="noopener noreferrer">مشاهده آگهی در دیوار</a>
+            <a class="deal-link" href="{escape(listing.url, quote=True)}" target="_blank" rel="noopener noreferrer">مشاهده آگهی در {escape(listing.source)}</a>
         </article>
         """
         columns[index].markdown(card, unsafe_allow_html=True)
@@ -145,6 +163,8 @@ def result_frame(items: list[RankedListing]) -> pd.DataFrame:
             {
                 "امتیاز": item.analysis.score,
                 "عنوان": item.listing.title,
+                "منبع": item.listing.source,
+                "دسته": category_label(item.listing.category),
                 "قیمت (تومان)": item.listing.price,
                 "متراژ": item.listing.area,
                 "موقعیت": item.listing.location,

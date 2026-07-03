@@ -45,6 +45,7 @@ class UserMemoryService:
                 "min_area": criteria.min_area,
                 "preferences": criteria.preferences,
                 "raw_query": raw_query,
+                "category": criteria.category,
             },
         )
         return self.repository.get_profile(user_id)
@@ -67,6 +68,7 @@ class UserMemoryService:
                 "city": listing.city,
                 "price": listing.price,
                 "area": listing.area,
+                "category": listing.category,
             },
         )
         return self.repository.get_profile(user_id)
