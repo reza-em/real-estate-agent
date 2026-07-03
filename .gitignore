@@ -4,3 +4,7 @@ __pycache__/
 .pytest_cache/
 listings.db
 listings.csv
+.venv-win/
+build/
+dist/
+*.spec

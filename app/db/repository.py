@@ -1,14 +1,30 @@
 from __future__ import annotations
 
 import json
+import os
+import shutil
 import sqlite3
+import sys
 from pathlib import Path
 
 from app.models.analysis import Analysis
 from app.models.listing import Listing
 
 
-DEFAULT_DB_PATH = Path(__file__).resolve().parents[2] / "listings.db"
+def _default_db_path() -> Path:
+    if not getattr(sys, "frozen", False):
+        return Path(__file__).resolve().parents[2] / "listings.db"
+
+    data_dir = Path(os.environ.get("LOCALAPPDATA", Path.home())) / "RealEstateAgent"
+    data_dir.mkdir(parents=True, exist_ok=True)
+    database = data_dir / "listings.db"
+    bundled_database = Path(getattr(sys, "_MEIPASS", ".")) / "listings.db"
+    if not database.exists() and bundled_database.exists():
+        shutil.copy2(bundled_database, database)
+    return database
+
+
+DEFAULT_DB_PATH = _default_db_path()
 
 
 class ListingRepository:
